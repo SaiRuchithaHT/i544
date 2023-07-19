@@ -40,10 +40,14 @@ function setupRoutes(app: Express.Application) {
   app.use(Express.json());  //all request bodies parsed as JSON.
 
   //routes for individual cells
-  //TODO
+  app.get(`${base}/:ssName/:cellId`, queryCellHandler(app));
+  app.patch(`${base}/:ssName/:cellId`, evaluateAndCopyCellHandler(app));
+  app.delete(`${base}/:ssName/:cellId`, removeCellHandler(app));
 
   //routes for entire spreadsheets
-  //TODO
+  app.delete(`${base}/:ssName`, clearSpreadsheetHandler(app));
+  app.put(`${base}/:ssName`, loadSpreadsheetHandler(app));
+  app.get(`${base}/:ssName`, dumpSpreadsheetHandler(app));
 
   //generic handlers: must be last
   app.use(make404Handler(app));
@@ -73,11 +77,136 @@ function setupRoutes(app: Express.Application) {
 
 /****************** Handlers for Spreadsheet Cells *********************/
 
-//TODO
+//This function handles the request to query a specific cell in a spreadsheet and returns its value and expression.
+function queryCellHandler(app: Express.Application) {
+  return async function (req: Express.Request, res: Express.Response) {
+    try {
+      const { ssName, cellId } = req.params;
+      const ssServices = app.locals.ssServices;
+
+      const result = await ssServices.query(ssName, cellId);
+      if (!result.isOk) throw result;
+
+      const value = result.val.value;
+      const expr = result.val.expr;
+      res.json(selfResult(req, { value, expr }));
+    } catch (err) {
+      const mapped = mapResultErrors(err);
+      res.status(mapped.status).json(mapped);
+    }
+  };
+}
+
+//This function handles the request to evaluate an expression or copy a cell in a spreadsheet and returns the updates.
+function evaluateAndCopyCellHandler(app: Express.Application) {
+  return async function (req: Express.Request, res: Express.Response) {
+    try {
+      const { ssName, cellId } = req.params;
+      const { expr, srcCellId } = req.query;
+      const ssServices = app.locals.ssServices;
+      if (!expr && !srcCellId) {
+        const errorMessage = 'Must provide either "expr" or "srcCellId" query parameter';
+        const errorResult = errResult(errorMessage, { code: 'BAD_REQ' });
+        const mapped = mapResultErrors(errorResult);
+        res.status(mapped.status).json(mapped);
+      }
+      else if (expr && srcCellId)
+      {
+        const errorMessage = 'Cannot provide both "expr" or "srcCellId" query parameter';
+        const errorResult = errResult(errorMessage, { code: 'BAD_REQ' });
+        const mapped = mapResultErrors(errorResult);
+        res.status(mapped.status).json(mapped);
+      }
+      if (expr)
+      {
+      const result = await ssServices.evaluate(ssName, cellId, expr);
+      if (!result.isOk) throw result;
+
+      const updates = result.val;
+      res.json(selfResult(req, updates));
+      }
+      else if(srcCellId)
+      {
+      const result = await ssServices.copy(ssName, cellId, srcCellId);
+      if (!result.isOk) throw result;
+
+      const updates = result.val;
+      res.json(selfResult(req, updates));
+      }
+    } catch (err) {
+      const mapped = mapResultErrors(err);
+      res.status(mapped.status).json(mapped);
+    }
+  };
+}
+
+//This function handles the request to remove a cell from a spreadsheet.
+function removeCellHandler(app: Express.Application) {
+  return async function (req: Express.Request, res: Express.Response) {
+    try {
+      const ssServices = app.locals.ssServices;
+      const { ssName, cellId } = req.params;
+      const result = await ssServices.remove(ssName, cellId);
+      if (!result.isOk) throw result;
+      res.json(selfResult(req, result.val));
+    } catch (err) {
+      const mapped = mapResultErrors(err);
+      res.status(mapped.status).json(mapped);
+    }
+  };
+}
 
 /**************** Handlers for Complete Spreadsheets *******************/
 
-//TODO
+//This function handles the request to clear all cells in a spreadsheet.
+function clearSpreadsheetHandler(app: Express.Application) {
+  return async function(req: Express.Request, res: Express.Response) {
+    try {
+      const ssServices = app.locals.ssServices;
+      const { ssName } = req.params;
+      const result = await ssServices.clear(ssName);
+      if (!result.isOk) throw result;
+      res.json(selfResult(req, result.val));
+    } catch (err) {
+      const mapped = mapResultErrors(err);
+      res.status(mapped.status).json(mapped);
+    }
+  };
+}
+
+//This function handles the request to load data into a spreadsheet.
+function loadSpreadsheetHandler(app: Express.Application) {
+  return async function(req: Express.Request, res: Express.Response) {
+    try {
+      const ssServices = app.locals.ssServices;
+      const { ssName } = req.params;
+      const data = req.body;
+      const result = await ssServices.load(ssName, data);
+      if (!result.isOk) throw result;
+      res.json(selfResult(req, result.val));
+    } catch (err) {
+      const mapped = mapResultErrors(err);
+      res.status(mapped.status).json(mapped);
+    }
+  };
+}
+
+//This function handles the request to retrieve the data from a spreadsheet.
+function dumpSpreadsheetHandler(app: Express.Application) {
+  return async function (req: Express.Request, res: Express.Response) {
+    try {
+      const ssServices = app.locals.ssServices;
+      const { ssName } = req.params;
+      const result = await ssServices.dump(ssName);
+      if (!result.isOk) throw result;
+      res.json(selfResult(req, result.val));
+    } catch (err) {
+      const mapped = mapResultErrors(err);
+      res.status(mapped.status).json(mapped);
+    }
+  };
+}
+
 
 /*************************** Generic Handlers **************************/
 
