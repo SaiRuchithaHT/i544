@@ -114,24 +114,7 @@ async function doFetchJson<T>(method: string, url: URL,
 			      jsonBody?: object)
   : Promise<Result<T>> 
 {
-  try {
-    const response = await fetch(url.toString(), {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: jsonBody ? JSON.stringify(jsonBody) : undefined,
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      return okResult(data.result as T);
-    } else {
-      return errResult(data.errors[0].message);
-    }
-  } catch (err) {
-    return errResult([{ message: err.toString() }]);
-  }
+  //TODO
+  return okResult('TODO' as any);
 }
 
