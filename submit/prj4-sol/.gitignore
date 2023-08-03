@@ -1,0 +1,6 @@
+dist
+target
+.parcel-cache
+node_modules
+*~
+
